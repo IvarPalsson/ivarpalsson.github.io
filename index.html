@@ -1,11 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Rastreador de Libros</title>
+    <link href="Estilos CSS/style.css" rel="stylesheet">
 </head>
+
 <body>
-    
+    <div class="container">
+        <header>
+            <h1>📚 Rastreador de Libros</h1>
+            <p>Busca y organiza tu biblioteca personal</p>
+        </header>
+
+        <div class="search-box">
+            <div class="search-input-group">
+                <input type="text" id="searchInput" placeholder="Buscar libros por título, autor o tema...">
+                <button class="search-btn" id="searchBtn">Buscar</button>
+            </div>
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">Todos</button>
+                <button class="filter-btn" data-filter="fiction">Ficción</button>
+                <button class="filter-btn" data-filter="science">Ciencia</button>
+                <button class="filter-btn" data-filter="history">Historia</button>
+                <button class="filter-btn" data-filter="fantasy">Fantasía</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <p>🔍 Buscando libros...</p>
+        </div>
+
+        <div class="no-results" id="noResults">
+            <p>😔 No se encontraron resultados. Intenta con otra búsqueda.</p>
+        </div>
+
+        <div class="results" id="results"></div>
+
+        <div class="my-books" id="myBooksSection" style="display: none;">
+            <h2>📖 Mi Biblioteca</h2>
+            <div class="my-books-list" id="myBooksList"></div>
+        </div>
+    </div>
 </body>
+
 </html>
