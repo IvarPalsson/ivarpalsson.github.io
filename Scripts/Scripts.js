@@ -1,38 +1,5 @@
-const books = [
-    {
-        id: 1,
-        title: "El nombre del viento",
-        author: "Patrick Rothfuss",
-        category: "fantasy",
-        description: "La historia de Kvothe, un arcanista legendario.",
-        year: 2007
-    },
-    {
-        id: 2,
-        title: "Breve historia del tiempo",
-        author: "Stephen Hawking",
-        category: "science",
-        description: "Introducción a conceptos de cosmología y física teórica.",
-        year: 1988
-    },
-    {
-        id: 3,
-        title: "Cien años de soledad",
-        author: "Gabriel García Márquez",
-        category: "fiction",
-        description: "La saga de la familia Buendía en Macondo.",
-        year: 1967
-    },
-    {
-        id: 4,
-        title: "Sapiens: De animales a dioses",
-        author: "Yuval Noah Harari",
-        category: "history",
-        description: "Un repaso a la historia de la humanidad.",
-        year: 2011
-    }
-    // Puedes añadir más libros de prueba
-];
+// ---------- Configuración de la API ----------
+const API_URL = "https://www.googleapis.com/books/v1/volumes";
 
 // ---------- Referencias a elementos del DOM ----------
 const searchInput = document.getElementById("searchInput");
@@ -51,6 +18,9 @@ let myBooks = [];
 
 // ---------- Inicialización ----------
 document.addEventListener("DOMContentLoaded", () => {
+    // Cargar libros guardados del localStorage
+    loadMyBooksFromStorage();
+
     // Buscar cuando se haga clic en el botón
     searchBtn.addEventListener("click", handleSearch);
 
@@ -72,41 +42,101 @@ document.addEventListener("DOMContentLoaded", () => {
             handleSearch(); // Reaplicar la búsqueda con el nuevo filtro
         });
     });
-
-    // Mostrar todos los libros al cargar por primera vez
-    renderBooks(books);
 });
 
 // ---------- Lógica principal de búsqueda ----------
-function handleSearch() {
-    const query = searchInput.value.trim().toLowerCase();
+async function handleSearch() {
+    // Si no hay query, usar una búsqueda por defecto
+    let query = searchInput.value.trim();
+    if (!query) {
+        query = "books"; // Búsqueda por defecto: libros populares
+    }
 
-    // Mostrar "cargando"
     showLoading(true);
     showNoResults(false);
     clearResults();
 
-    
-    setTimeout(() => {
-        // 1. Filtrar por texto
-        let filtered = books.filter(book => {
-            const text = (book.title + " " + book.author + " " + book.description).toLowerCase();
-            const matchesText = text.includes(query);
-
-            // 2. Filtrar por categoría
-            const matchesCategory = currentFilter === "all" || book.category === currentFilter;
-
-            return matchesText && matchesCategory;
-        });
+    try {
+        const books = await fetchBooksFromAPI(query, currentFilter);
 
         showLoading(false);
 
-        if (filtered.length === 0) {
+        if (!books || books.length === 0) {
             showNoResults(true);
-        } else {
-            renderBooks(filtered);
+            return;
         }
-    }, 400); // 400 ms solo para que se vea el "Buscando libros..."
+
+        renderBooks(books);
+    } catch (error) {
+        console.error("Error al buscar libros:", error);
+        showLoading(false);
+        showNoResults(true);
+        noResultsElement.innerHTML = "<p>⚠️ Ha ocurrido un error al buscar libros. Inténtalo de nuevo más tarde.</p>";
+    }
+}
+
+// ---------- Llamada a la API de Google Books ----------
+async function fetchBooksFromAPI(query, filter) {
+    // Añadimos un pequeño refinamiento según el filtro
+    let finalQuery = query;
+
+    const filterMap = {
+        fiction: "subject:fiction",
+        science: "subject:science",
+        history: "subject:history",
+        fantasy: "subject:fantasy"
+    };
+
+    if (filter !== "all" && filterMap[filter]) {
+        finalQuery += ` ${filterMap[filter]}`;
+    }
+
+    const url = `${API_URL}?q=${encodeURIComponent(finalQuery)}&maxResults=20&langRestrict=es`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error("Respuesta no válida de la API");
+    }
+
+    const data = await response.json();
+
+    if (!data.items) {
+        return [];
+    }
+
+    // Transformamos los datos de la API al formato que usa nuestra app
+    const books = data.items.map((item, index) => {
+        const info = item.volumeInfo || {};
+        const imageLinks = info.imageLinks || {};
+        const categories = info.categories || [];
+
+        return {
+            id: item.id || index,
+            title: info.title || "Sin título",
+            author: (info.authors && info.authors.join(", ")) || "Autor desconocido",
+            year: info.publishedDate ? info.publishedDate.slice(0, 4) : "—",
+            category: inferCategory(categories),
+            description: info.description || "Sin descripción disponible.",
+            thumbnail: imageLinks.thumbnail || imageLinks.smallThumbnail || ""
+        };
+    });
+
+    return books;
+}
+
+// ---------- Inferir categoría a partir de los temas ----------
+function inferCategory(categoriesArray) {
+    if (!categoriesArray || categoriesArray.length === 0) return "others";
+
+    const text = categoriesArray.join(" ").toLowerCase();
+
+    if (text.includes("fantasy")) return "fantasy";
+    if (text.includes("fiction") || text.includes("novela")) return "fiction";
+    if (text.includes("history") || text.includes("historia")) return "history";
+    if (text.includes("science") || text.includes("ciencia")) return "science";
+
+    return "others";
 }
 
 // ---------- Funciones de UI ----------
@@ -118,12 +148,17 @@ function renderBooks(bookList) {
         card.classList.add("book-card");
 
         card.innerHTML = `
-            <h3>${book.title}</h3>
-            <p><strong>Autor:</strong> ${book.author}</p>
-            <p><strong>Año:</strong> ${book.year}</p>
-            <p><strong>Categoría:</strong> ${mapCategory(book.category)}</p>
-            <p>${book.description}</p>
-            <button class="add-btn">Añadir a mi biblioteca</button>
+            <div class="book-card-inner">
+                ${book.thumbnail ? `<img class="book-cover" src="${book.thumbnail}" alt="Portada de ${book.title}">` : ""}
+                <div class="book-info">
+                    <h3>${book.title}</h3>
+                    <p><strong>Autor:</strong> ${book.author}</p>
+                    <p><strong>Año:</strong> ${book.year}</p>
+                    <p><strong>Categoría:</strong> ${mapCategory(book.category)}</p>
+                    <p class="book-description">${book.description}</p>
+                    <button class="add-btn">Añadir a mi biblioteca</button>
+                </div>
+            </div>
         `;
 
         const addBtn = card.querySelector(".add-btn");
@@ -131,7 +166,7 @@ function renderBooks(bookList) {
 
         resultsContainer.appendChild(card);
     });
-}
+}   
 
 function clearResults() {
     resultsContainer.innerHTML = "";
@@ -156,8 +191,29 @@ function mapCategory(category) {
 }
 
 // ---------- Gestión de "Mi Biblioteca" ----------
+// Guardar libros en localStorage
+function saveMyBooksToStorage() {
+    try {
+        localStorage.setItem("myBooksLibrary", JSON.stringify(myBooks));
+    } catch (error) {
+        console.error("Error al guardar en localStorage:", error);
+    }
+}
+
+// Cargar libros del localStorage
+function loadMyBooksFromStorage() {
+    try {
+        const savedBooks = localStorage.getItem("myBooksLibrary");
+        if (savedBooks) {
+            myBooks = JSON.parse(savedBooks);
+            renderMyBooks();
+        }
+    } catch (error) {
+        console.error("Error al cargar del localStorage:", error);
+    }
+}
+
 function addToMyBooks(book) {
-    // Si ya está, no lo duplicamos
     const alreadyAdded = myBooks.some(b => b.id === book.id);
     if (alreadyAdded) {
         alert("Este libro ya está en tu biblioteca.");
@@ -166,6 +222,7 @@ function addToMyBooks(book) {
 
     myBooks.push(book);
     renderMyBooks();
+    saveMyBooksToStorage(); // Guardar después de agregar
 }
 
 function renderMyBooks() {
@@ -197,4 +254,5 @@ function renderMyBooks() {
 function removeFromMyBooks(bookId) {
     myBooks = myBooks.filter(b => b.id !== bookId);
     renderMyBooks();
+    saveMyBooksToStorage(); // Guardar después de eliminar
 }
