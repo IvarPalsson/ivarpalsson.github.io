@@ -1,5 +1,3 @@
-# ivarpalsson.github.io
-0487EDD Trabajar en Equipo
 # 📚 Rastreador de Libros
 
 Este proyecto es un **rastreador de libros** diseñado para que los usuarios puedan organizar sus lecturas, descubrir nuevos títulos y llevar un control de su progreso.
